@@ -1,3 +1,6 @@
+apt install python3-pip
+pip install --upgrade google-api-python-client google-auth-httplib2 google-auth-oauthlib
+
 1) Требуется создать project в google cloud
 https://console.cloud.google.com/
 
