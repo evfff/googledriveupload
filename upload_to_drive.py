@@ -13,8 +13,8 @@ SERVICE_ACCOUNT_FILE = 'service_account.json'  # Path to the service account cre
 PARENT_FOLDER_ID = "12uXxBYCP5AVTWlevr3MvsmwHdBwVsuGe"  # ID of the folder in Google Drive where backups will be uploaded
 
 # Directories where backup files are stored
-BOT_DB_BACKUP_DIR = '/home/devops/python/backuptest/opt/backup/bot_db/'  # Directory containing bot_db backup files
-SITE_DB_BACKUP_DIR = '/home/devops/python/backuptest/opt/backup/site_db/'  # Directory containing site_db backup files
+BOT_DB_BACKUP_DIR = '/opt/backup/bot_db/'  # Directory containing bot_db backup files
+SITE_DB_BACKUP_DIR = '/opt/backup/site_db/'  # Directory containing site_db backup files
 
 # Parameter to specify the age of files to delete from Google Drive (in days)
 FILE_AGE_DAYS = 7  # Number of days to determine the age of files to delete
