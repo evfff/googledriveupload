@@ -1,15 +1,16 @@
 # pip install google-api-python-client
 from googleapiclient.discovery import build
 from google.oauth2 import service_account
-from googleapiclient.http import MediaFileUpload
+from googleapiclient.http import MediaFileUpload, MediaIoBaseUpload
 import os
 import glob
 import datetime
-
+import io
 
 # Define the scopes required for Google Drive API
 SCOPES = ['https://www.googleapis.com/auth/drive.file']  # Permissions needed to upload and manage files in Google Drive
 SERVICE_ACCOUNT_FILE = 'service_account.json'  # Path to the service account credentials file
+
 PARENT_FOLDER_ID = "12uXxBYCP5AVTWlevr3MvsmwHdBwVsuGe"  # ID of the folder in Google Drive where backups will be uploaded
 
 # Directories where backup files are stored
@@ -17,7 +18,9 @@ BOT_DB_BACKUP_DIR = '/opt/backup/bot_db/'  # Directory containing bot_db backup 
 SITE_DB_BACKUP_DIR = '/opt/backup/site_db/'  # Directory containing site_db backup files
 
 # Parameter to specify the age of files to delete from Google Drive (in days)
-FILE_AGE_DAYS = 7  # Number of days to determine the age of files to delete
+FILE_AGE_DAYS = 2  # Number of days to determine the age of files to delete
+
+CHUNK_SIZE = 10 * 1024 * 1024  # 10 MB chunks for upload
 
 def authenticate():
     """Authenticate and build the Google Drive service."""
@@ -37,24 +40,29 @@ def get_latest_backup_file(directory):
     latest_file = max(files, key=os.path.getctime)
     return latest_file
 
-def upload(file_path, upload_name):
-    """Upload a file to Google Drive with a specified name."""
-    service = authenticate()  # Authenticate and get the Google Drive service
-    
+def chunked_upload(service, file_path, upload_name):
+    """Upload a file to Google Drive in chunks."""
     # Metadata for the file
     file_metadata = {
-        'name': upload_name,  # Use the specified name for uploading
-        'parents': [PARENT_FOLDER_ID]  # Specify the parent folder ID in Google Drive
+        'name': upload_name,
+        'parents': [PARENT_FOLDER_ID]
     }
-    
-    # Upload the file
-    media = MediaFileUpload(file_path)  # Create a MediaFileUpload object for the file
-    file = service.files().create(
-        body=file_metadata,
-        media_body=media
-    ).execute()  # Perform the upload
-    
-    print(f"Uploaded file: {file_path} as {upload_name}")
+
+    # Open the file in binary read mode
+    with open(file_path, 'rb') as file:
+        # Initiate a MediaIoBaseUpload with chunking enabled
+        media = MediaIoBaseUpload(file, mimetype='application/gzip', chunksize=CHUNK_SIZE, resumable=True)
+
+        # Create the file on Google Drive and start chunked upload
+        request = service.files().create(body=file_metadata, media_body=media)
+        
+        response = None
+        while response is None:
+            status, response = request.next_chunk()
+            if status:
+                print(f"Uploaded {int(status.progress() * 100)}% of {upload_name}")
+
+    print(f"Upload of {upload_name} complete.")
 
 def upload_backup_with_prefix(directory, prefix):
     """Upload the latest backup file with a specific prefix."""
@@ -67,8 +75,9 @@ def upload_backup_with_prefix(directory, prefix):
         # Create the upload file name with the prefix
         upload_name = f"{prefix}_{base_name}"
         
-        # Upload the file to Google Drive with the prefixed name
-        upload(latest_backup, upload_name)
+        # Upload the file to Google Drive in chunks
+        service = authenticate()
+        chunked_upload(service, latest_backup, upload_name)
 
 def delete_old_backups(directory_prefix):
     """Delete backup files from Google Drive that are older than the specified age for a specific directory."""
@@ -101,7 +110,7 @@ def delete_old_backups(directory_prefix):
 def main():
     """Main function to handle backup operations."""
     # Upload the latest bot_db backup with prefix
-    upload_backup_with_prefix(BOT_DB_BACKUP_DIR, "bot_db")
+   # upload_backup_with_prefix(BOT_DB_BACKUP_DIR, "bot_db")
 
     # Upload the latest site_db backup with prefix
     upload_backup_with_prefix(SITE_DB_BACKUP_DIR, "site_db")
